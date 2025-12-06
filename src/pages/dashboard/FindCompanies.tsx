@@ -9,11 +9,11 @@ import { useUser } from '../../context/UserContext';
 import { UK_SPONSORS_SAMPLE } from '../../lib/data/uk_sponsors_sample';
 
 export default function FindCompanies() {
-  const { profile, incrementMatchesUsed } = useUser();
+  const { profile, incrementMatchesUsed, addApplication } = useUser();
   const [viewMode, setViewMode] = useState<'all' | 'ai'>('ai');
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [unlockModal, setUnlockModal] = useState<{ isOpen: boolean; companyId: string | null }>({ isOpen: false, companyId: null });
-  
+
   // Filter State
   const [filters, setFilters] = useState<FilterState>({
     search: '',
@@ -30,7 +30,7 @@ export default function FindCompanies() {
     // Simulate fetching and processing data
     const loadData = () => {
       setIsLoading(true);
-      
+
       // Convert raw UK data to our App's Company interface
       const processedData: Company[] = UK_SPONSORS_SAMPLE.map(sponsor => {
         // --- MATCHING ALGORITHM ---
@@ -39,7 +39,7 @@ export default function FindCompanies() {
 
         // 1. Industry Match
         if (profile?.industries && profile.industries.length > 0) {
-          const isIndustryMatch = profile.industries.some(ind => 
+          const isIndustryMatch = profile.industries.some(ind =>
             sponsor.industry?.toLowerCase().includes(ind.toLowerCase())
           );
           if (isIndustryMatch) {
@@ -50,8 +50,8 @@ export default function FindCompanies() {
 
         // 2. Location Match
         if (profile?.locations && profile.locations.length > 0) {
-          const isLocationMatch = profile.locations.some(loc => 
-            sponsor.town.toLowerCase().includes(loc.toLowerCase()) || 
+          const isLocationMatch = profile.locations.some(loc =>
+            sponsor.town.toLowerCase().includes(loc.toLowerCase()) ||
             (loc.toLowerCase() === 'london' && ['croydon', 'dartford', 'epsom'].includes(sponsor.town.toLowerCase()))
           );
           if (isLocationMatch) {
@@ -62,14 +62,16 @@ export default function FindCompanies() {
 
         // 3. Skill Match (Simulated based on industry)
         if (profile?.skills && profile.skills.length > 0) {
-           if (score > 70) {
-             score += 5;
-             reasons.push(`Hiring for ${profile.skills[0]}`);
-           }
+          if (score > 70) {
+            score += 5;
+            reasons.push(`Hiring for ${profile.skills[0]}`);
+          }
         }
 
         // Cap score at 99
         score = Math.min(99, score);
+
+        const isApplied = profile?.applications?.includes(sponsor.id) || false;
 
         return {
           id: sponsor.id,
@@ -77,9 +79,10 @@ export default function FindCompanies() {
           industry: sponsor.industry || 'Other',
           location: sponsor.town,
           routes: [sponsor.route],
-          isLocked: true,
+          isLocked: true && !isApplied, // If applied, it's unlocked by default (in real life)
           matchScore: score,
-          matchReasons: reasons
+          matchReasons: reasons,
+          hasApplied: isApplied
         };
       });
 
@@ -88,7 +91,7 @@ export default function FindCompanies() {
     };
 
     loadData();
-  }, [profile]);
+  }, [profile]); // Refetch when profile changes (e.g. apps added)
 
   // --- FILTERING LOGIC ---
   const displayedCompanies = useMemo(() => {
@@ -131,11 +134,20 @@ export default function FindCompanies() {
     setUnlockModal({ isOpen: true, companyId: id });
   };
 
+  const handleApplyClick = (id: string) => {
+    // In real app, this would open the external job URL
+    if (addApplication) {
+      addApplication(id);
+      // Optimistic update locally to show checkmark immediately
+      setCompanies(prev => prev.map(c => c.id === id ? { ...c, hasApplied: true } : c));
+    }
+  };
+
   const confirmUnlock = () => {
     if (unlockModal.companyId) {
       const success = incrementMatchesUsed();
       if (success) {
-        setCompanies(prev => prev.map(c => 
+        setCompanies(prev => prev.map(c =>
           c.id === unlockModal.companyId ? { ...c, isLocked: false } : c
         ));
         setUnlockModal({ isOpen: false, companyId: null });
@@ -153,7 +165,7 @@ export default function FindCompanies() {
     <div className="flex flex-col lg:flex-row gap-8 h-[calc(100vh-100px)]">
       {/* Mobile Filters Toggle */}
       <div className="lg:hidden mb-4">
-        <button 
+        <button
           onClick={() => setShowMobileFilters(!showMobileFilters)}
           className="w-full flex items-center justify-center gap-2 py-3 bg-surface border border-white/10 rounded-xl text-white font-medium"
         >
@@ -206,7 +218,7 @@ export default function FindCompanies() {
 
         {/* AI Context Banner */}
         {viewMode === 'ai' && profile && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             className="bg-gradient-to-r from-primary/10 to-secondary/10 border border-primary/20 rounded-xl p-4 mb-6 flex items-start gap-3"
@@ -227,28 +239,13 @@ export default function FindCompanies() {
         {isLoading ? (
           <div className="flex items-center justify-center h-64">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 overflow-y-auto pb-10 pr-2 custom-scrollbar">
-            {displayedCompanies.length > 0 ? (
-              displayedCompanies.map((company) => (
-                <CompanyCard 
-                  key={company.id} 
-                  company={company} 
-                  onUnlock={handleUnlockClick} 
-                />
-              ))
-            ) : (
-              <div className="col-span-full text-center py-12 text-gray-400">
-                No companies found matching your filters. Try clearing them.
-              </div>
             )}
           </div>
         )}
       </div>
 
       {/* Unlock Modal */}
-      <UnlockModal 
+      <UnlockModal
         isOpen={unlockModal.isOpen}
         onClose={() => setUnlockModal({ isOpen: false, companyId: null })}
         onConfirm={confirmUnlock}

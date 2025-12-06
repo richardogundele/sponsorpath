@@ -16,6 +16,9 @@ export interface UserProfile {
   subscriptionTier: 'Free' | 'Basic' | 'Pro' | 'Unlimited';
   matchesUsed: number;
   matchesLimit: number;
+  // Application Tracking
+  applications: string[]; // List of Company IDs
+  interviews: number;
 }
 
 interface UserContextType {
@@ -23,6 +26,7 @@ interface UserContextType {
   updateProfile: (data: Partial<UserProfile>) => void;
   completeOnboarding: () => void;
   incrementMatchesUsed: () => boolean; // Returns true if successful
+  addApplication: (companyId: string) => void;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -41,6 +45,8 @@ const DEFAULT_PROFILE: UserProfile = {
   subscriptionTier: 'Free',
   matchesUsed: 0,
   matchesLimit: 5, // Free tier limit
+  applications: [],
+  interviews: 0
 };
 
 export function UserProvider({ children }: { children: React.ReactNode }) {
@@ -70,13 +76,20 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const incrementMatchesUsed = () => {
     if (!profile) return false;
     if (profile.matchesUsed >= profile.matchesLimit) return false;
-    
+
     updateProfile({ matchesUsed: profile.matchesUsed + 1 });
     return true;
   };
 
+  const addApplication = (companyId: string) => {
+    if (!profile) return;
+    if (!profile.applications.includes(companyId)) {
+      updateProfile({ applications: [...profile.applications, companyId] });
+    }
+  };
+
   return (
-    <UserContext.Provider value={{ profile, updateProfile, completeOnboarding, incrementMatchesUsed }}>
+    <UserContext.Provider value={{ profile, updateProfile, completeOnboarding, incrementMatchesUsed, addApplication }}>
       {children}
     </UserContext.Provider>
   );
