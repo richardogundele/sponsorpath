@@ -239,6 +239,21 @@ export default function FindCompanies() {
         {isLoading ? (
           <div className="flex items-center justify-center h-64">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {displayedCompanies.map((company) => (
+              <CompanyCard
+                key={company.id}
+                company={company}
+                onUnlock={handleUnlockClick}
+                onApply={handleApplyClick}
+              />
+            ))}
+            {displayedCompanies.length === 0 && (
+              <div className="col-span-full text-center py-12 text-gray-400">
+                <p>No companies found matching your criteria.</p>
+              </div>
             )}
           </div>
         )}
